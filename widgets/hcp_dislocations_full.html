@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>HCP slip: ⟨a⟩ and ⟨c⟩ dislocations in the TEM</title>
+<style>
+  :root{
+    --ink:#10141f; --panel:#1a2030; --panel2:#232b40;
+    --text:#e8e6df; --muted:#9aa3b5;
+    --accentA:#f2b134; --accentB:#e05263; --plane:#6fc2ff;
+    --stroke:#333d55; --ok:#7fd08a; --bad:#e08b8b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;background:var(--ink);color:var(--text);
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;overflow:hidden}
+  #app{display:flex;flex-direction:column;height:100%}
+  #view{position:relative;flex:1 1 auto;min-height:0;touch-action:none}
+  #view canvas{display:block}
+  #hud{position:absolute;left:12px;top:10px;pointer-events:none;line-height:1.35}
+  #hud .title{font-size:14.5px;font-weight:600;letter-spacing:.2px}
+  #hud .sub{font-size:12px;color:var(--muted)}
+  #gtag{position:absolute;right:14px;bottom:12px;pointer-events:none;font-size:14px;
+    font-weight:600;color:#222;display:none;background:rgba(255,255,255,.65);
+    padding:3px 9px;border-radius:6px}
+  #legend{position:absolute;right:12px;top:10px;pointer-events:none;font-size:11px;
+    color:var(--muted);text-align:right;line-height:1.55}
+  .chip{display:inline-block;width:9px;height:9px;border-radius:2px;margin-left:6px;vertical-align:middle}
+  #panel{flex:0 0 auto;background:var(--panel);border-top:1px solid var(--stroke);
+    padding:9px 14px 12px;display:flex;flex-direction:column;gap:7px}
+  .row{display:flex;gap:8px;align-items:center}
+  .seg{display:flex;flex:1;background:var(--panel2);border:1px solid var(--stroke);
+    border-radius:9px;overflow:hidden}
+  .seg button{flex:1;padding:8px 4px;border:0;background:transparent;color:var(--muted);
+    font-size:12.5px;font-family:inherit;font-weight:600;cursor:pointer;transition:background .15s,color .15s}
+  .seg button.on{background:#3a4a72;color:#fff}
+  .seg button:disabled{opacity:.28;cursor:default}
+  select{flex:1;padding:9px 10px;border-radius:9px;border:1px solid var(--stroke);
+    background:var(--panel2);color:var(--text);font-size:13px;font-family:inherit;font-weight:600;
+    -webkit-appearance:none;appearance:none}
+  #play{width:44px;height:36px;border-radius:9px;border:1px solid var(--stroke);
+    background:var(--panel2);color:var(--text);font-size:15px;cursor:pointer;flex:0 0 auto}
+  #scrub{flex:1;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:#39435e;outline:none}
+  #scrub::-webkit-slider-thumb{-webkit-appearance:none;width:19px;height:19px;border-radius:50%;
+    background:var(--accentA);border:2px solid var(--ink)}
+  #caption{font-size:12.5px;color:var(--text);line-height:1.45;min-height:3.1em}
+  #caption b{color:var(--accentA);font-weight:600}
+  #caption .bv{color:var(--accentB);font-weight:600}
+  #verdict{font-size:13px;font-weight:600;min-height:1.3em}
+  #verdict .yes{color:var(--ok)} #verdict .no{color:var(--bad)} #verdict .res{color:var(--accentA)}
+  #temrows{display:none;flex-direction:column;gap:7px}
+  .lab{font-size:11px;color:var(--muted);width:34px;flex:0 0 auto}
+  sub,sup{font-size:.72em}
+  .ov{text-decoration:overline}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="view">
+    <div id="hud">
+      <div class="title" id="hud-title"></div>
+      <div class="sub" id="hud-sub">drag to rotate · pinch or scroll to zoom</div>
+    </div>
+    <div id="legend">
+      slip plane<span class="chip" style="background:var(--plane)"></span><br>
+      dislocation line<span class="chip" style="background:var(--accentA)"></span><br>
+      Burgers vector b<span class="chip" style="background:var(--accentB)"></span><br>
+      slipped atoms<span class="chip" style="background:#d98e5f"></span>
+    </div>
+    <div id="gtag"></div>
+  </div>
+  <div id="panel">
+    <div class="row">
+      <select id="bsel">
+        <option value="a3">b = ⅓[112&#x305;0] &nbsp;·&nbsp; prism (1&#x305;100)</option>
+        <option value="a2">b = ⅓[12&#x305;10] &nbsp;·&nbsp; prism (101&#x305;0)</option>
+        <option value="a1">b = ⅓[2&#x305;110] &nbsp;·&nbsp; prism (011&#x305;0)</option>
+        <option value="c">b = [0001] ⟨c⟩ &nbsp;·&nbsp; prism (1&#x305;100)</option>
+      </select>
+    </div>
+    <div class="row">
+      <div class="seg" id="seg-plane">
+        <button data-v="basal" class="on">Basal (0001)</button>
+        <button data-v="prism">Prism</button>
+      </div>
+      <div class="seg" id="seg-char">
+        <button data-v="edge" class="on">Edge</button>
+        <button data-v="screw">Screw</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="seg" id="seg-view">
+        <button data-v="lab" class="on">3D lab view</button>
+        <button data-v="tem">TEM image</button>
+      </div>
+    </div>
+    <div id="temrows">
+      <div class="row">
+        <span class="lab">beam</span>
+        <div class="seg" id="seg-beam">
+          <button data-v="z" class="on">[0001]</button>
+          <button data-v="y">[<span class="ov">1</span>100]</button>
+          <button data-v="x">[11<span class="ov">2</span>0]</button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="lab">g</span>
+        <div class="seg" id="seg-g">
+          <button data-v="g0002">0002</button>
+          <button data-v="g1100"><span class="ov">1</span>100</button>
+          <button data-v="g1010">10<span class="ov">1</span>0</button>
+          <button data-v="g1120">11<span class="ov">2</span>0</button>
+        </div>
+      </div>
+      <div id="verdict"></div>
+    </div>
+    <div class="row">
+      <button id="play" aria-label="play">❚❚</button>
+      <input id="scrub" type="range" min="0" max="1000" value="0">
+    </div>
+    <div id="caption"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+const V3=(x,y,z)=>new THREE.Vector3(x,y,z);
+const Z=V3(0,0,1);
+const OV="\u0305";
+
+/* ---------- lattice ---------- */
+const a=1.0, c=1.633*a, ROW=a*Math.sqrt(3)/2;
+const Boff={x:0.5*a, y:a/(2*Math.sqrt(3))};
+const NLAY=8, W=7.0*a, NROW=7;
+const H=(NLAY-1)*c/2, D=(NROW-1)*ROW+Boff.y;
+
+const atoms=[];
+for(let k=0;k<NLAY;k++){
+  const z=k*c/2, isB=(k%2===1);
+  for(let j=0;j<NROW;j++)for(let i=-8;i<16;i++){
+    let x=i*a+(j%2)*(a/2), y=j*ROW;
+    if(isB){x+=Boff.x;y+=Boff.y;}
+    if(x>-0.05&&x<W+0.05) atoms.push({x0:x,y0:y,z0:z,isB:isB});
+  }
+}
+const N=atoms.length;
+const zPlane=(3*c/2+4*c/2)/2+0.01;
+const wCore=0.9*a;
+
+/* ---------- variants ----------
+   frame: x=[11-20], y=[-1100], z=[0001]. g.b = (hu+kv+it+lw)/3 for <a>, = l for [0001]. */
+const VAR={
+  a3:{phi:0,           bLab:"\u2153[112"+OV+"0]", pLab:"(1"+OV+"100)", bMag:a,
+      gdotb:{g0002:0, g1100:0,  g1010:1,  g1120:2}},
+  a2:{phi:2*Math.PI/3, bLab:"\u2153[12"+OV+"10]", pLab:"(101"+OV+"0)", bMag:a,
+      gdotb:{g0002:0, g1100:-1, g1010:0,  g1120:-1}},
+  a1:{phi:4*Math.PI/3, bLab:"\u2153[2"+OV+"110]", pLab:"(011"+OV+"0)", bMag:a,
+      gdotb:{g0002:0, g1100:1,  g1010:-1, g1120:-1}},
+  c: {phi:0,           bLab:"[0001]",             pLab:"(1"+OV+"100)", bMag:c,
+      gdotb:{g0002:2, g1100:0,  g1010:0,  g1120:0}}
+};
+const GV={
+  g0002:{label:"0002",       dir:V3(0,0,1)},
+  g1100:{label:"1"+OV+"100", dir:V3(0,1,0)},
+  g1010:{label:"101"+OV+"0", dir:V3(Math.sqrt(3)/2,0.5,0)},
+  g1120:{label:"112"+OV+"0", dir:V3(1,0,0)}
+};
+const BEAM={
+  z:{dir:V3(0,0,1), up:V3(0,1,0), name:"[0001]",       allowed:["g1100","g1010","g1120"]},
+  y:{dir:V3(0,1,0), up:V3(0,0,1), name:"[1"+OV+"100]", allowed:["g0002","g1120"]},
+  x:{dir:V3(1,0,0), up:V3(0,0,1), name:"[112"+OV+"0]", allowed:["g0002","g1100"]}
+};
+
+let variant="a3", plane="basal", ch="edge", viewMode="lab";
+let beam="z", gSel="g1120";
+let t=0, playing=true, speed=0.0038;
+
+/* ---------- variant frame ---------- */
+let e1,e2,p1min,p1max,p2min,p2max,d0,mid1,mid2;
+function setVariant(){
+  const phi=VAR[variant].phi;
+  e1=V3(Math.cos(phi),Math.sin(phi),0);
+  e2=V3(-Math.sin(phi),Math.cos(phi),0);
+  p1min=1e9;p1max=-1e9;p2min=1e9;p2max=-1e9;
+  const proj2=[];
+  for(const A_ of atoms){
+    const s1=A_.x0*e1.x+A_.y0*e1.y, s2=A_.x0*e2.x+A_.y0*e2.y;
+    if(s1<p1min)p1min=s1; if(s1>p1max)p1max=s1;
+    if(s2<p2min)p2min=s2; if(s2>p2max)p2max=s2;
+    proj2.push(s2);
+  }
+  mid1=(p1min+p1max)/2; mid2=(p2min+p2max)/2;
+  proj2.sort((u,v)=>u-v);
+  const uniq=[]; for(const s of proj2){ if(!uniq.length||s-uniq[uniq.length-1]>1e-3)uniq.push(s); }
+  let best=0, bestPos=mid2;
+  const lo=p2min+(p2max-p2min)*0.30, hi=p2min+(p2max-p2min)*0.70;
+  for(let i=0;i<uniq.length-1;i++){
+    const gap=uniq[i+1]-uniq[i], mid=(uniq[i+1]+uniq[i])/2;
+    if(mid>lo&&mid<hi&&gap>best){best=gap;bestPos=mid;}
+  }
+  d0=bestPos;
+}
+
+/* ---------- mode definition ----------
+   planeType: "z" (basal) or "p" (prism)
+   sweep: which coordinate the front moves along ("p1","p2","z")
+   lineDir / bDir: unit vectors */
+function modeId(){
+  if(variant==="c") return "c-"+ch;
+  return plane+"-"+ch;
+}
+function modeDef(){
+  const id=modeId();
+  if(id==="basal-edge")  return {planeType:"z",sweep:"p1",lineDir:e2,bDir:e1};
+  if(id==="basal-screw") return {planeType:"z",sweep:"p2",lineDir:e1,bDir:e1};
+  if(id==="prism-edge")  return {planeType:"p",sweep:"p1",lineDir:Z, bDir:e1};
+  if(id==="prism-screw") return {planeType:"p",sweep:"z", lineDir:e1,bDir:e1};
+  if(id==="c-edge")      return {planeType:"p",sweep:"z", lineDir:e1,bDir:Z};
+  /* c-screw */          return {planeType:"p",sweep:"p1",lineDir:Z, bDir:Z};
+}
+function sweepRange(m){
+  if(m.sweep==="p1") return [p1min-3.2*wCore, p1max+3.2*wCore];
+  if(m.sweep==="p2") return [p2min-3.2*wCore, p2max+3.2*wCore];
+  return [0-3.2*wCore, H+3.2*wCore];
+}
+function contrast(){
+  const m=modeDef();
+  const gb=VAR[variant].gdotb[gSel];
+  if(Math.abs(gb)>0) return {level:Math.abs(gb)===2?1.0:0.8, kind:"strong", gb:gb};
+  const bxu=m.bDir.clone().cross(m.lineDir);
+  const res=Math.abs(GV[gSel].dir.dot(bxu));
+  if(res>0.05) return {level:0.22, kind:"residual", gb:0};
+  return {level:0.05, kind:"invisible", gb:0};
+}
+
+/* ---------- scene ---------- */
+const view=document.getElementById("view");
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x10141f);
+const persp=new THREE.PerspectiveCamera(42,1,0.1,200);
+const ortho=new THREE.OrthographicCamera(-1,1,1,-1,-100,200);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+view.appendChild(renderer.domElement);
+
+const target=V3(W/2,D/2,H/2);
+let camR=14.5, camTheta=0.55, camPhi=1.12, orthoZoom=1;
+function placePersp(){
+  persp.position.set(
+    target.x+camR*Math.sin(camPhi)*Math.cos(camTheta),
+    target.y+camR*Math.sin(camPhi)*Math.sin(camTheta),
+    target.z+camR*Math.cos(camPhi));
+  persp.up.set(0,0,1); persp.lookAt(target);
+}
+function placeOrtho(){
+  const B=BEAM[beam];
+  ortho.position.copy(target).addScaledVector(B.dir,20);
+  ortho.up.copy(B.up); ortho.lookAt(target);
+  const w=view.clientWidth,h=view.clientHeight,asp=w/h;
+  const half=(Math.max(W,D,H)/2+2.2*a)/orthoZoom;
+  ortho.left=-half*asp;ortho.right=half*asp;ortho.top=half;ortho.bottom=-half;
+  ortho.updateProjectionMatrix();
+}
+placePersp();
+
+scene.add(new THREE.AmbientLight(0xffffff,0.55));
+const keyL=new THREE.DirectionalLight(0xffffff,0.85);keyL.position.set(6,-8,12);scene.add(keyL);
+const fill=new THREE.DirectionalLight(0x88aaff,0.25);fill.position.set(-6,8,-4);scene.add(fill);
+
+const geo=new THREE.SphereGeometry(0.21*a,18,14);
+const mat=new THREE.MeshStandardMaterial({roughness:0.5,metalness:0.1});
+const mesh=new THREE.InstancedMesh(geo,mat,N);
+mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(mesh);
+const COL_A=new THREE.Color(0x8fb6d9),COL_B=new THREE.Color(0x5f86a8),
+      COL_SLIP=new THREE.Color(0xd98e5f);
+const tmpM=new THREE.Matrix4(),tmpC=new THREE.Color(),tmpQ=new THREE.Quaternion(),
+      tmpR=new THREE.Matrix4();
+
+const planeMat=new THREE.MeshBasicMaterial({color:0x6fc2ff,transparent:true,
+  opacity:0.14,side:THREE.DoubleSide,depthWrite:false});
+const planeMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),planeMat);
+scene.add(planeMesh);
+const planeEdge=new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.PlaneGeometry(1,1)),
+  new THREE.LineBasicMaterial({color:0x6fc2ff,transparent:true,opacity:0.5}));
+planeMesh.add(planeEdge);
+
+const lineMat=new THREE.MeshBasicMaterial({color:0xf2b134,transparent:true,opacity:1});
+const lineMesh=new THREE.Mesh(new THREE.CylinderGeometry(0.09*a,0.09*a,1,12),lineMat);
+scene.add(lineMesh);
+
+const bArrow=new THREE.ArrowHelper(V3(1,0,0),V3(0,0,0),1.6*a,0xe05263,0.5*a,0.28*a);
+scene.add(bArrow);
+const gArrow=new THREE.ArrowHelper(V3(1,0,0),V3(0,0,0),2.0*a,0x333333,0.6*a,0.3*a);
+scene.add(gArrow); gArrow.visible=false;
+
+/* ---------- static layout ---------- */
+function layoutStatics(){
+  setVariant();
+  const m=modeDef();
+  if(m.planeType==="z"){
+    planeMesh.quaternion.identity();
+    planeMesh.scale.set(W+2.4*a,D+2.4*a,1);
+    planeMesh.position.set(W/2,D/2,zPlane);
+  }else{
+    tmpR.makeBasis(e1.clone(),Z.clone(),e1.clone().cross(Z));
+    planeMesh.quaternion.setFromRotationMatrix(tmpR);
+    planeMesh.scale.set(p1max-p1min+2.4*a,H+2.4*a,1);
+    planeMesh.position.set(0,0,H/2)
+      .addScaledVector(e1,mid1).addScaledVector(e2,d0);
+  }
+  bArrow.setDirection(m.bDir);
+  bArrow.setLength(1.6*VAR[variant].bMag,0.5*a,0.28*a);
+  bArrow.position.set(W*0.15,-2.0*a,H+1.4*a);
+}
+
+/* ---------- per-frame ---------- */
+function updateDynamic(){
+  const m=modeDef();
+  const [s0,s1]=sweepRange(m);
+  const sF=s0+t*(s1-s0);
+  const tem=(viewMode==="tem");
+  const con=tem?contrast():null;
+  const bMag=VAR[variant].bMag;
+
+  /* line */
+  const ld=m.lineDir;
+  const len=(ld.z>0.9)?H+1.6*a:
+            (Math.abs(ld.dot(e2))>0.9)?(p2max-p2min+1.6*a):(p1max-p1min+1.6*a);
+  lineMesh.scale.set(1,len,1);
+  tmpQ.setFromUnitVectors(V3(0,1,0),ld);
+  lineMesh.quaternion.copy(tmpQ);
+  let c1,c2,c3;
+  const id=modeId();
+  if(id==="basal-edge"){c1=sF;c2=mid2;c3=zPlane;}
+  else if(id==="basal-screw"){c1=mid1;c2=sF;c3=zPlane;}
+  else if(id==="prism-edge"){c1=sF;c2=d0;c3=H/2;}
+  else if(id==="prism-screw"){c1=mid1;c2=d0;c3=sF;}
+  else if(id==="c-edge"){c1=mid1;c2=d0;c3=sF;}
+  else {c1=sF;c2=d0;c3=H/2;}   /* c-screw */
+  lineMesh.position.set(0,0,c3).addScaledVector(e1,c1).addScaledVector(e2,c2);
+  lineMesh.visible=sF>s0+2.0*wCore&&sF<s1-2.0*wCore;
+
+  if(tem){lineMat.color.set(0x1a1a1a);lineMat.opacity=con.level;}
+  else{lineMat.color.set(0xf2b134);lineMat.opacity=1;}
+
+  /* atoms */
+  for(let i=0;i<N;i++){
+    const A_=atoms[i];
+    const s1p=A_.x0*e1.x+A_.y0*e1.y, s2p=A_.x0*e2.x+A_.y0*e2.y;
+    const side=(m.planeType==="z")?(A_.z0>zPlane?1:-1):(s2p>d0?1:-1);
+    const s=(m.sweep==="p1")?s1p:(m.sweep==="p2")?s2p:A_.z0;
+    const sig=0.5*(1+Math.tanh((sF-s)/wCore));
+    const u=side*0.5*bMag*sig;
+    tmpM.makeTranslation(A_.x0+u*m.bDir.x, A_.y0+u*m.bDir.y, A_.z0+u*m.bDir.z);
+    mesh.setMatrixAt(i,tmpM);
+    if(tem){tmpC.set(0xc9c9c2);}
+    else{
+      const base=A_.isB?COL_B:COL_A;
+      if(side>0&&sig>0.5)tmpC.copy(base).lerp(COL_SLIP,Math.min(1,(sig-0.5)*2));
+      else tmpC.copy(base);
+    }
+    mesh.setColorAt(i,tmpC);
+  }
+  mesh.instanceMatrix.needsUpdate=true;
+  if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
+}
+
+/* ---------- text ---------- */
+const CAP={
+ "basal-edge":'<b>Edge, basal</b> · line ⊥ <span class="bv">b</span> in the close-packed layer, glides parallel to <span class="bv">b</span>.',
+ "basal-screw":'<b>Screw, basal</b> · line ∥ <span class="bv">b</span>, moves sideways; helical ramp around the core.',
+ "prism-edge":'<b>Edge, prism</b> · line runs along <b>c</b> for every ⟨a⟩ variant — down [0001] all prism edges project to dots.',
+ "prism-screw":'<b>Screw, prism</b> · line ∥ <span class="bv">b</span>, advancing along c. Down [0001] the whole prism plane projects onto one ⟨a⟩ trace line: any dislocation on it looks perfectly straight.',
+ "c-edge":'<b>Edge, ⟨c⟩</b> · <span class="bv">b</span> = [0001], line ∥ ⟨a⟩ in the prism plane, climbing/gliding along c. Pure ⟨c⟩ glide is rarely activated — c-axis strain is usually carried by ⟨c+a⟩ on pyramidal planes; ⟨c⟩ dislocations are often grown-in or from loop condensation.',
+ "c-screw":'<b>Screw, ⟨c⟩</b> · line ∥ <span class="bv">b</span> ∥ [0001] — the stealth defect: end-on (a dot) down [0001] AND g·b = 0 for every in-plane g. Only an l ≠ 0 reflection (0002) reveals it.'
+};
+const TEMCAP={
+ strong:'Diffracting planes are bent by this dislocation\u2019s strain field → dark contrast.',
+ residual:'g·b = 0, but this is an edge: g·(b×u) ≠ 0 → faint residual contrast survives.',
+ invisible:'g·b = 0 and g·(b×u) = 0 — planes unbent, dislocation present but invisible.'
+};
+function refreshText(){
+  const vr=VAR[variant];
+  const planeName=(variant==="c")?"prism "+vr.pLab:
+    (plane==="basal"?"basal (0001)":"prism "+vr.pLab);
+  document.getElementById("hud-title").textContent=
+    "b = "+vr.bLab+"  ·  "+planeName+"  ·  "+ch+
+    (viewMode==="tem"?"  ·  B = "+BEAM[beam].name:"");
+  document.getElementById("hud-sub").textContent=
+    viewMode==="tem"?"BF, orthographic projection along the beam":"drag to rotate · pinch or scroll to zoom";
+  const capEl=document.getElementById("caption");
+  if(viewMode==="lab"){capEl.innerHTML=CAP[modeId()];return;}
+  const con=contrast(), g=GV[gSel];
+  let verdict;
+  if(con.kind==="strong")
+    verdict='g·b = '+con.gb+' → <span class="yes">visible'+(Math.abs(con.gb)===2?' (strong)':'')+'</span>';
+  else if(con.kind==="residual")
+    verdict='g·b = 0, g·(b×u) ≠ 0 → <span class="res">faint residual</span>';
+  else
+    verdict='g·b = 0 → <span class="no">invisible</span>';
+  document.getElementById("verdict").innerHTML='g = '+g.label+', b = '+vr.bLab+' :  '+verdict;
+  capEl.innerHTML=TEMCAP[con.kind];
+  document.getElementById("gtag").textContent="g = "+g.label;
+}
+
+/* ---------- UI ---------- */
+function segWire(id,cb){
+  const seg=document.getElementById(id);
+  seg.addEventListener("click",e=>{
+    const btn=e.target.closest("button");if(!btn||btn.disabled)return;
+    seg.querySelectorAll("button").forEach(b=>b.classList.remove("on"));
+    btn.classList.add("on");cb(btn.dataset.v);
+  });
+}
+function refreshPlaneButtons(){
+  const seg=document.getElementById("seg-plane");
+  const basalBtn=seg.querySelector('button[data-v="basal"]');
+  const prismBtn=seg.querySelector('button[data-v="prism"]');
+  if(variant==="c"){
+    plane="prism";
+    basalBtn.disabled=true;
+    basalBtn.classList.remove("on"); prismBtn.classList.add("on");
+  }else{
+    basalBtn.disabled=false;
+    basalBtn.classList.toggle("on",plane==="basal");
+    prismBtn.classList.toggle("on",plane==="prism");
+  }
+}
+function refreshGButtons(){
+  const seg=document.getElementById("seg-g");
+  const allowed=BEAM[beam].allowed;
+  seg.querySelectorAll("button").forEach(b=>{
+    const ok=allowed.includes(b.dataset.v);
+    b.disabled=!ok;
+    b.classList.toggle("on",b.dataset.v===gSel&&ok);
+  });
+  if(!allowed.includes(gSel)){
+    gSel=allowed[0];
+    seg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===gSel));
+  }
+}
+document.getElementById("bsel").addEventListener("change",e=>{
+  variant=e.target.value;t=0;playing=true;playBtn.textContent="❚❚";
+  refreshPlaneButtons();layoutStatics();refreshText();
+});
+segWire("seg-plane",v=>{plane=v;t=0;playing=true;playBtn.textContent="❚❚";layoutStatics();refreshText();});
+segWire("seg-char", v=>{ch=v;   t=0;playing=true;playBtn.textContent="❚❚";layoutStatics();refreshText();});
+segWire("seg-view", v=>{
+  viewMode=v;
+  const tem=(v==="tem");
+  document.getElementById("temrows").style.display=tem?"flex":"none";
+  document.getElementById("legend").style.display=tem?"none":"block";
+  document.getElementById("gtag").style.display=tem?"block":"none";
+  scene.background=new THREE.Color(tem?0xdededa:0x10141f);
+  planeMesh.visible=!tem; bArrow.visible=!tem; gArrow.visible=false;
+  if(tem){refreshGButtons();placeOrtho();updateGArrow();}
+  refreshText();
+});
+segWire("seg-beam",v=>{beam=v;refreshGButtons();placeOrtho();updateGArrow();refreshText();});
+segWire("seg-g",  v=>{gSel=v;updateGArrow();refreshText();});
+
+function updateGArrow(){
+  if(viewMode!=="tem"){gArrow.visible=false;return;}
+  const g=GV[gSel],B=BEAM[beam];
+  gArrow.setDirection(g.dir);
+  const right=new THREE.Vector3().crossVectors(B.up,B.dir).normalize();
+  gArrow.position.copy(target)
+    .addScaledVector(right,-(Math.max(W,D,H)/2+1.2*a))
+    .addScaledVector(B.up,-(Math.max(W,D,H)/2+0.6*a))
+    .addScaledVector(B.dir,5);
+  gArrow.visible=true;
+}
+
+const playBtn=document.getElementById("play");
+const scrub=document.getElementById("scrub");
+playBtn.addEventListener("click",()=>{playing=!playing;playBtn.textContent=playing?"❚❚":"▶";});
+scrub.addEventListener("input",()=>{playing=false;playBtn.textContent="▶";t=scrub.value/1000;});
+
+/* ---------- pointer ---------- */
+let ptrs=new Map(),lastPinch=0;
+view.addEventListener("pointerdown",e=>{ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});view.setPointerCapture(e.pointerId);});
+view.addEventListener("pointermove",e=>{
+  if(!ptrs.has(e.pointerId))return;
+  const prev=ptrs.get(e.pointerId);
+  if(ptrs.size===1&&viewMode==="lab"){
+    camTheta-=(e.clientX-prev.x)*0.0055;
+    camPhi-=(e.clientY-prev.y)*0.0055;
+    camPhi=Math.max(0.15,Math.min(Math.PI-0.15,camPhi));
+    placePersp();
+  }
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2){
+    const p=[...ptrs.values()],d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);
+    if(lastPinch>0){
+      if(viewMode==="lab"){camR*=lastPinch/d;camR=Math.max(6,Math.min(30,camR));placePersp();}
+      else{orthoZoom*=d/lastPinch;orthoZoom=Math.max(0.5,Math.min(4,orthoZoom));placeOrtho();}
+    }
+    lastPinch=d;
+  }
+});
+["pointerup","pointercancel"].forEach(ev=>view.addEventListener(ev,e=>{ptrs.delete(e.pointerId);lastPinch=0;}));
+view.addEventListener("wheel",e=>{
+  e.preventDefault();
+  if(viewMode==="lab"){camR*=(1+e.deltaY*0.001);camR=Math.max(6,Math.min(30,camR));placePersp();}
+  else{orthoZoom*=(1-e.deltaY*0.001);orthoZoom=Math.max(0.5,Math.min(4,orthoZoom));placeOrtho();}
+},{passive:false});
+
+/* ---------- resize / loop ---------- */
+function resize(){
+  const w=view.clientWidth,h=view.clientHeight;
+  renderer.setSize(w,h);
+  persp.aspect=w/h;persp.updateProjectionMatrix();
+  placeOrtho();
+}
+window.addEventListener("resize",resize);
+
+function loop(){
+  requestAnimationFrame(loop);
+  if(playing){
+    t+=speed;
+    if(t>1.18)t=0;
+    scrub.value=Math.min(1000,Math.round(t*1000));
+  }
+  updateDynamic();
+  renderer.render(scene,viewMode==="tem"?ortho:persp);
+}
+
+refreshPlaneButtons();layoutStatics();refreshText();resize();loop();
+})();
+</script>
+</body>
+</html>

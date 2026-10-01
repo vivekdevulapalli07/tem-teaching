@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ewald Sphere Explorer</title>
+</head>
+<body>
+<style>
+  .es-root {
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6;
+    --accent-2: #eb6834;
+    --dim-dot: #c3c2b7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .es-root {
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --border: rgba(255,255,255,0.10);
+      --accent: #3987e5;
+      --accent-2: #d95926;
+      --dim-dot: #46453f;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] .es-root {
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --border: rgba(255,255,255,0.10);
+    --accent: #3987e5;
+    --accent-2: #d95926;
+    --dim-dot: #46453f;
+    color-scheme: dark;
+  }
+
+  .es-root * { box-sizing: border-box; }
+  .es-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+    padding: 20px 16px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  .es-header h1 { font-size: 1.35rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .es-header p { margin: 0; color: var(--text-secondary); font-size: 0.92rem; max-width: 680px; line-height: 1.5; }
+
+  .es-main { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
+  @media (max-width: 760px) { .es-main { grid-template-columns: 1fr; } }
+
+  .es-panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .es-canvas-wrap { position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 8px; overflow: hidden; background: var(--surface-1); }
+  .es-canvas-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .es-tooltip {
+    position: absolute; pointer-events: none; background: var(--text-primary); color: var(--surface-1);
+    font-size: 0.72rem; padding: 5px 8px; border-radius: 6px; line-height: 1.4; transform: translate(-50%, -115%);
+    white-space: nowrap; opacity: 0; transition: opacity 0.08s; z-index: 3; font-variant-numeric: tabular-nums;
+  }
+  .es-tooltip.visible { opacity: 1; }
+
+  .es-controls { display: flex; flex-direction: column; gap: 14px; }
+  .es-field { display: flex; flex-direction: column; gap: 4px; }
+  .es-field-label { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary); }
+  .es-field-label span:last-child { font-variant-numeric: tabular-nums; color: var(--text-primary); font-weight: 600; }
+  .es-field input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+  .es-btn {
+    font: inherit; font-size: 0.82rem; padding: 7px 12px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); cursor: pointer;
+  }
+  .es-btn[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: transparent; }
+  .es-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .es-legend { display: flex; align-items: center; gap: 10px; font-size: 0.75rem; color: var(--text-secondary); flex-wrap: wrap; }
+  .es-swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--border); }
+
+  .es-formula {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.7;
+  }
+  .es-formula .eq { font-style: italic; color: var(--text-primary); font-size: 0.95rem; display: block; margin: 4px 0; }
+  .es-readout { font-size: 0.82rem; color: var(--text-secondary); min-height: 1.4em; }
+  .es-readout b { color: var(--text-primary); font-weight: 600; }
+</style>
+
+<div class="es-root">
+  <div class="es-header">
+    <h1>Ewald Sphere Explorer</h1>
+    <p>The circle is the 2D cross-section of the Ewald sphere: every reciprocal lattice point it touches satisfies the von Laue condition and diffracts. Rotate the crystal or change the electron wavelength and watch reflections sweep on and off the circle.</p>
+  </div>
+
+  <div class="es-main">
+    <div class="es-panel">
+      <div class="es-canvas-wrap" id="canvasWrap">
+        <canvas id="esCanvas"></canvas>
+        <div class="es-tooltip" id="tooltip"></div>
+      </div>
+      <div class="es-legend">
+        <span class="es-swatch" style="background:var(--dim-dot)"></span> off Bragg condition
+        <span class="es-swatch" style="background:var(--accent)"></span> on Bragg condition
+        <span style="margin-left:auto">hover a spot for details</span>
+      </div>
+    </div>
+
+    <div class="es-panel es-controls">
+      <div class="es-field">
+        <label class="es-field-label"><span>Beam wavenumber k (&times; 2&pi;/a)</span><span id="valK"></span></label>
+        <input type="range" id="kSlider" min="1.5" max="8" step="0.05" value="4">
+      </div>
+      <div class="es-field">
+        <label class="es-field-label"><span>Crystal rotation &theta;</span><span id="valTheta"></span></label>
+        <input type="range" id="theta" min="0" max="360" step="1" value="20">
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="es-btn" id="autoBtn" type="button" aria-pressed="false" style="flex:1">Auto-rotate</button>
+      </div>
+      <div class="es-field">
+        <label class="es-field-label"><span>Rotation speed</span><span id="valSpeed"></span></label>
+        <input type="range" id="speed" min="0.1" max="2" step="0.1" value="0.5">
+      </div>
+      <div class="es-field">
+        <label class="es-field-label"><span>Crystal perfection (relrod width)</span><span id="valTol"></span></label>
+        <input type="range" id="tol" min="0.05" max="0.5" step="0.01" value="0.22">
+      </div>
+      <div class="es-field">
+        <label class="es-field-label"><span>Cell shape: |a&#8322;| / |a&#8321;|</span><span id="valRatio"></span></label>
+        <input type="range" id="ratio" min="0.6" max="1.8" step="0.02" value="1">
+      </div>
+      <div class="es-field">
+        <label class="es-field-label"><span>Cell angle &gamma;</span><span id="valGamma"></span></label>
+        <input type="range" id="gamma" min="60" max="120" step="1" value="90">
+      </div>
+    </div>
+  </div>
+
+  <div class="es-formula">
+    A reflection (h, k) diffracts when the momentum transfer lands exactly on a reciprocal lattice point, <b style="color:var(--text-primary)">q = G<sub>hk</sub></b> — the von Laue condition. Off that condition by a small amount, the mismatch is the <b style="color:var(--text-primary)">excitation error</b> from Lecture 5:
+    <span class="eq">s<sub>g</sub> = |G<sub>hk</sub> &minus; C| &minus; k</span>
+    where C is the Ewald circle's centre. A thicker or more perfect crystal narrows the tolerance on s<sub>g</sub> — its reciprocal lattice "spots" sharpen into points; a thin or imperfect one broadens them into the relrods this slider approximates.
+    <div class="es-readout" id="readout">Hover a reciprocal lattice point to read its excitation error.</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const root = document.currentScript.previousElementSibling;
+  const canvas = root.querySelector('#esCanvas');
+  const tooltip = root.querySelector('#tooltip');
+  const readout = root.querySelector('#readout');
+  const kSlider = root.querySelector('#kSlider');
+  const thetaSlider = root.querySelector('#theta');
+  const speedSlider = root.querySelector('#speed');
+  const tolSlider = root.querySelector('#tol');
+  const ratioSlider = root.querySelector('#ratio');
+  const gammaSlider = root.querySelector('#gamma');
+  const autoBtn = root.querySelector('#autoBtn');
+
+  const TWO_PI = 2 * Math.PI;
+  let autoRotate = false;
+  let lastTime = performance.now();
+
+  autoBtn.addEventListener('click', () => {
+    autoRotate = !autoRotate;
+    autoBtn.setAttribute('aria-pressed', String(autoRotate));
+    autoBtn.textContent = autoRotate ? 'Stop rotating' : 'Auto-rotate';
+  });
+
+  [kSlider, thetaSlider, speedSlider, tolSlider, ratioSlider, gammaSlider].forEach(el =>
+    el.addEventListener('input', render)
+  );
+
+  function fitDPR(cv) {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = cv.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width * dpr));
+    const h = Math.max(1, Math.round(rect.height * dpr));
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    return { w, h, dpr };
+  }
+
+  function reciprocalVectors(a1, a2) {
+    const area = a1[0] * a2[1] - a1[1] * a2[0];
+    const b1 = [TWO_PI * a2[1] / area, -TWO_PI * a2[0] / area];
+    const b2 = [-TWO_PI * a1[1] / area, TWO_PI * a1[0] / area];
+    return [b1, b2];
+  }
+
+  let lastPoints = []; // {h,k,x,y (world), s, hit}
+  let lastK = 4, lastC = [0, 0], lastScale = 1, lastCx = 0, lastCy = 0;
+
+  function render() {
+    const { w, h } = fitDPR(canvas);
+    const ctx = canvas.getContext('2d');
+    const cs = getComputedStyle(root);
+    const gridColor = cs.getPropertyValue('--grid').trim();
+    const accent = cs.getPropertyValue('--accent').trim();
+    const dimDot = cs.getPropertyValue('--dim-dot').trim();
+    const textSecondary = cs.getPropertyValue('--text-secondary').trim();
+    const surface = cs.getPropertyValue('--surface-1').trim();
+
+    const kMag = parseFloat(kSlider.value) * TWO_PI;
+    const thetaDeg = parseFloat(thetaSlider.value);
+    const theta = thetaDeg * Math.PI / 180;
+    const tol = parseFloat(tolSlider.value) * TWO_PI;
+    const ratio = parseFloat(ratioSlider.value);
+    const gamma = parseFloat(gammaSlider.value) * Math.PI / 180;
+
+    root.querySelector('#valK').textContent = parseFloat(kSlider.value).toFixed(2);
+    root.querySelector('#valTheta').textContent = Math.round(thetaDeg) + '°';
+    root.querySelector('#valSpeed').textContent = parseFloat(speedSlider.value).toFixed(1) + '×';
+    root.querySelector('#valTol').textContent = parseFloat(tolSlider.value).toFixed(2);
+    root.querySelector('#valRatio').textContent = ratio.toFixed(2);
+    root.querySelector('#valGamma').textContent = Math.round(gamma * 180 / Math.PI) + '°';
+
+    const a1 = [1, 0];
+    const a2 = [ratio * Math.cos(gamma), ratio * Math.sin(gamma)];
+    const [b1, b2] = reciprocalVectors(a1, a2);
+
+    // world -> pixel: fixed view window sized to comfortably contain the circle
+    const viewHalf = kMag * 2.3 + TWO_PI;
+    const scale = Math.min(w, h) / (2 * viewHalf);
+    const cx = w / 2, cy = h / 2;
+    const toPx = (x, y) => [cx + x * scale, cy - y * scale];
+
+    ctx.clearRect(0, 0, w, h);
+
+    // faint axes
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+    ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+    ctx.stroke();
+
+    // Ewald circle: centred at C = (-k, 0), passes through origin (000)
+    const C = [-kMag, 0];
+    const [Cpx, Cpy] = toPx(C[0], C[1]);
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(Cpx, Cpy, kMag * scale, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // incident beam k0: from C to origin
+    const [Opx, Opy] = toPx(0, 0);
+    ctx.strokeStyle = textSecondary;
+    ctx.lineWidth = 1.4;
+    drawArrow(ctx, Cpx, Cpy, Opx, Opy);
+    ctx.fillStyle = textSecondary;
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillText('k₀', (Cpx + Opx) / 2 - 4, (Cpy + Opy) / 2 - 6);
+
+    // reciprocal lattice points, rotated by theta
+    const range = 7;
+    const points = [];
+    const cosT = Math.cos(theta), sinT = Math.sin(theta);
+    for (let hh = -range; hh <= range; hh++) {
+      for (let kk = -range; kk <= range; kk++) {
+        if (hh === 0 && kk === 0) continue;
+        let gx = hh * b1[0] + kk * b2[0];
+        let gy = hh * b1[1] + kk * b2[1];
+        const rx = gx * cosT - gy * sinT;
+        const ry = gx * sinT + gy * cosT;
+        const dx = rx - C[0], dy = ry - C[1];
+        const d = Math.sqrt(dx * dx + dy * dy);
+        const s = d - kMag;
+        const hit = Math.abs(s) < tol;
+        const strength = hit ? 1 - Math.abs(s) / tol : 0;
+        points.push({ h: hh, k: kk, x: rx, y: ry, s, hit, strength });
+      }
+    }
+
+    // draw non-hit points first (muted), then hits on top with diffracted-beam arrows
+    ctx.fillStyle = dimDot;
+    for (const p of points) {
+      if (p.hit) continue;
+      const [px, py] = toPx(p.x, p.y);
+      if (px < -10 || px > w + 10 || py < -10 || py > h + 10) continue;
+      ctx.beginPath();
+      ctx.arc(px, py, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (const p of points) {
+      if (!p.hit) continue;
+      const [px, py] = toPx(p.x, p.y);
+      const alpha = 0.35 + 0.65 * p.strength;
+      ctx.strokeStyle = withAlpha(accent, alpha * 0.7);
+      ctx.lineWidth = 1.2;
+      drawArrow(ctx, Cpx, Cpy, px, py);
+      ctx.fillStyle = withAlpha(accent, alpha);
+      ctx.beginPath();
+      ctx.arc(px, py, 3 + 3.5 * p.strength, 0, Math.PI * 2);
+      ctx.fill();
+      if (p.strength > 0.55) {
+        ctx.fillStyle = textSecondary;
+        ctx.font = '10px system-ui, sans-serif';
+        ctx.fillText(`${p.h},${p.k}`, px + 6, py - 6);
+      }
+    }
+
+    // origin marker
+    ctx.fillStyle = textSecondary;
+    ctx.beginPath();
+    ctx.arc(Opx, Opy, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    lastPoints = points;
+    lastK = kMag; lastC = C; lastScale = scale; lastCx = cx; lastCy = cy;
+  }
+
+  function withAlpha(hex, alpha) {
+    const v = parseInt(hex.slice(1), 16);
+    const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255;
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function drawArrow(ctx, x0, y0, x1, y1) {
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+    const ang = Math.atan2(y1 - y0, x1 - x0);
+    const len = 6;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 - len * Math.cos(ang - 0.4), y1 - len * Math.sin(ang - 0.4));
+    ctx.lineTo(x1 - len * Math.cos(ang + 0.4), y1 - len * Math.sin(ang + 0.4));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width * canvas.width;
+    const py = (e.clientY - rect.top) / rect.height * canvas.height;
+    let nearest = null, bestD = Infinity;
+    for (const p of lastPoints) {
+      const [qx, qy] = [lastCx + p.x * lastScale, lastCy - p.y * lastScale];
+      const d = (qx - px) * (qx - px) + (qy - py) * (qy - py);
+      if (d < bestD) { bestD = d; nearest = { p, qx, qy }; }
+    }
+    if (!nearest || bestD > 20 * 20) {
+      tooltip.classList.remove('visible');
+      return;
+    }
+    const cssX = nearest.qx / canvas.width * rect.width;
+    const cssY = nearest.qy / canvas.height * rect.height;
+    tooltip.style.left = cssX + 'px';
+    tooltip.style.top = cssY + 'px';
+    tooltip.classList.add('visible');
+    const sRel = (nearest.p.s / (2 * Math.PI)).toFixed(2);
+    const status = nearest.p.hit ? 'on Bragg condition' : 'off Bragg condition';
+    tooltip.textContent = `(h,k)=(${nearest.p.h},${nearest.p.k})  sₘ=${sRel}×2π/a  ${status}`;
+    readout.innerHTML = `Reflection <b>(${nearest.p.h}, ${nearest.p.k})</b>: excitation error <b>s<sub>g</sub> = ${sRel} &times; 2&pi;/a</b> &mdash; <b>${status}</b>.`;
+  });
+  canvas.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+
+  window.addEventListener('resize', render);
+  if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+
+  function loop(now) {
+    const dt = Math.min(50, now - lastTime);
+    lastTime = now;
+    if (autoRotate) {
+      let v = parseFloat(thetaSlider.value) + dt * 0.03 * parseFloat(speedSlider.value);
+      v = ((v % 360) + 360) % 360;
+      thetaSlider.value = v;
+    }
+    render();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

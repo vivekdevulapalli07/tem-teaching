@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Structure Factor Lab</title>
+</head>
+<body>
+<style>
+  .sf-root {
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6;
+    --atom2: #eb6834;
+    --heat-0: #fcfcfb;
+    --heat-1: #cde2fb;
+    --heat-2: #86b6ef;
+    --heat-3: #3987e5;
+    --heat-4: #1c5cab;
+    --heat-5: #0d366b;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .sf-root {
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --border: rgba(255,255,255,0.10);
+      --accent: #3987e5;
+      --atom2: #d95926;
+      --heat-0: #1a1a19;
+      --heat-1: #104281;
+      --heat-2: #184f95;
+      --heat-3: #256abf;
+      --heat-4: #5598e7;
+      --heat-5: #9ec5f4;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] .sf-root {
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --border: rgba(255,255,255,0.10);
+    --accent: #3987e5;
+    --atom2: #d95926;
+    --heat-0: #1a1a19;
+    --heat-1: #104281;
+    --heat-2: #184f95;
+    --heat-3: #256abf;
+    --heat-4: #5598e7;
+    --heat-5: #9ec5f4;
+    color-scheme: dark;
+  }
+
+  .sf-root * { box-sizing: border-box; }
+  .sf-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+    padding: 20px 16px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  .sf-header h1 {
+    font-size: 1.35rem;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .sf-header p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    max-width: 640px;
+    line-height: 1.5;
+  }
+
+  .sf-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .sf-preset-btn {
+    font: inherit;
+    font-size: 0.82rem;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-1);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .sf-preset-btn[aria-pressed="true"] {
+    background: var(--accent);
+    color: #fff;
+    border-color: transparent;
+  }
+  .sf-preset-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .sf-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 620px) {
+    .sf-main { grid-template-columns: 1fr; }
+  }
+
+  .sf-panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sf-panel h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin: 0;
+    font-weight: 600;
+  }
+  .sf-canvas-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--heat-0);
+  }
+  .sf-canvas-wrap canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .sf-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--text-primary);
+    color: var(--surface-1);
+    font-size: 0.72rem;
+    padding: 5px 8px;
+    border-radius: 6px;
+    line-height: 1.4;
+    transform: translate(-50%, -110%);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.08s;
+    z-index: 3;
+    font-variant-numeric: tabular-nums;
+  }
+  .sf-tooltip.visible { opacity: 1; }
+
+  .sf-controls {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px 20px;
+  }
+  @media (max-width: 620px) {
+    .sf-controls { grid-template-columns: 1fr; }
+  }
+  .sf-field { display: flex; flex-direction: column; gap: 4px; }
+  .sf-field-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+  .sf-field-label span:last-child {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  .sf-field input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+  .sf-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+  }
+  .sf-toggle-row input { accent-color: var(--accent); }
+
+  .sf-legend {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+  .sf-legend .swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border); }
+  .sf-ramp {
+    height: 10px;
+    width: 90px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--heat-0), var(--heat-1), var(--heat-2), var(--heat-3), var(--heat-4), var(--heat-5));
+    border: 1px solid var(--border);
+  }
+
+  .sf-formula {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+  .sf-formula .eq {
+    font-style: italic;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    display: block;
+    margin: 4px 0;
+  }
+  .sf-readout {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    min-height: 1.4em;
+  }
+  .sf-readout b { color: var(--text-primary); font-weight: 600; }
+</style>
+
+<div class="sf-root">
+  <div class="sf-header">
+    <h1>Structure Factor Lab</h1>
+    <p>Edit the atoms inside one unit cell of a 2D crystal and watch which diffraction spots survive. The pattern on the right is the exact Fourier transform of the lattice on the left — computed live, not simulated.</p>
+  </div>
+
+  <div class="sf-presets" role="group" aria-label="Presets">
+    <button class="sf-preset-btn" data-preset="simple" type="button">Simple lattice</button>
+    <button class="sf-preset-btn" data-preset="checker" type="button">Two identical atoms</button>
+    <button class="sf-preset-btn" data-preset="partial" type="button">Two different atoms</button>
+    <button class="sf-preset-btn" data-preset="custom" type="button" id="customBtn" disabled>Custom</button>
+  </div>
+
+  <div class="sf-main">
+    <div class="sf-panel">
+      <h2>Real space — the crystal</h2>
+      <div class="sf-canvas-wrap">
+        <canvas id="realCanvas"></canvas>
+      </div>
+      <div class="sf-legend">
+        <span class="swatch" style="background:var(--accent)"></span> atom 1
+        <span class="swatch" style="background:var(--atom2)" id="atom2Swatch"></span> <span id="atom2Label">atom 2</span>
+      </div>
+    </div>
+    <div class="sf-panel">
+      <h2>Reciprocal space — the diffraction pattern</h2>
+      <div class="sf-canvas-wrap">
+        <canvas id="reciCanvas"></canvas>
+        <div class="sf-tooltip" id="tooltip"></div>
+      </div>
+      <div class="sf-legend">
+        weak <span class="sf-ramp"></span> strong
+      </div>
+      <div class="sf-readout" id="readout">Hover the pattern to read off intensity at any (h,k).</div>
+    </div>
+  </div>
+
+  <div class="sf-controls">
+    <div class="sf-field">
+      <label class="sf-field-label"><span>Crystal size N₁ (cells along a₁)</span><span id="valN1"></span></label>
+      <input type="range" id="N1" min="1" max="18" step="1" value="8">
+    </div>
+    <div class="sf-field">
+      <label class="sf-field-label"><span>Crystal size N₂ (cells along a₂)</span><span id="valN2"></span></label>
+      <input type="range" id="N2" min="1" max="18" step="1" value="8">
+    </div>
+    <div class="sf-field">
+      <label class="sf-field-label"><span>Cell shape: |a₂| / |a₁|</span><span id="valRatio"></span></label>
+      <input type="range" id="ratio" min="0.5" max="2" step="0.01" value="1">
+    </div>
+    <div class="sf-field">
+      <label class="sf-field-label"><span>Cell angle γ (a₁ to a₂)</span><span id="valGamma"></span></label>
+      <input type="range" id="gamma" min="60" max="120" step="1" value="90">
+    </div>
+    <div class="sf-field">
+      <label class="sf-field-label"><span>Atom 2 position u₂ (along a₁)</span><span id="valU2"></span></label>
+      <input type="range" id="u2" min="0" max="1" step="0.01" value="0.5">
+    </div>
+    <div class="sf-field">
+      <label class="sf-field-label"><span>Atom 2 position v₂ (along a₂)</span><span id="valV2"></span></label>
+      <input type="range" id="v2" min="0" max="1" step="0.01" value="0.5">
+    </div>
+    <div class="sf-field">
+      <label class="sf-field-label"><span>Atom 2 scattering strength f₂ / f₁</span><span id="valW"></span></label>
+      <input type="range" id="wRatio" min="0" max="1" step="0.01" value="1">
+    </div>
+    <div class="sf-field" style="justify-content:flex-end; gap:10px;">
+      <div class="sf-toggle-row">
+        <input type="checkbox" id="atom2On" checked>
+        <label for="atom2On">Include atom 2 (two-atom basis)</label>
+      </div>
+      <div class="sf-toggle-row">
+        <input type="checkbox" id="logScale" checked>
+        <label for="logScale">Log-compress intensity for display</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="sf-formula">
+    Each unit cell has a basis of atoms at fractional positions (u<sub>j</sub>, v<sub>j</sub>) with scattering strength f<sub>j</sub>. The amplitude diffracted into order (h, k) is the <b style="color:var(--text-primary)">structure factor</b>:
+    <span class="eq">S(h,k) = Σ<sub>j</sub> f<sub>j</sub> · e<sup>−2πi(h·u<sub>j</sub> + k·v<sub>j</sub>)</sup></span>
+    and the measured intensity is <span class="eq">I(h,k) ∝ |S(h,k)|² · [sharpening from N₁ × N₂ finite repeats]</span>. When the basis atoms interfere destructively — <b style="color:var(--text-primary)">S(h,k) = 0</b> — that reflection is <b style="color:var(--text-primary)">systematically absent</b>, no matter how strong each individual atom scatters.
+  </div>
+</div>
+
+<script>
+(function () {
+  const root = document.currentScript.previousElementSibling;
+  const realCanvas = root.querySelector('#realCanvas');
+  const reciCanvas = root.querySelector('#reciCanvas');
+  const tooltip = root.querySelector('#tooltip');
+  const readout = root.querySelector('#readout');
+  const atom2Swatch = root.querySelector('#atom2Swatch');
+  const atom2Label = root.querySelector('#atom2Label');
+
+  const ids = ['N1','N2','ratio','gamma','u2','v2','wRatio'];
+  const inputs = {};
+  ids.forEach(id => inputs[id] = root.querySelector('#' + id));
+  const atom2OnEl = root.querySelector('#atom2On');
+  const logScaleEl = root.querySelector('#logScale');
+
+  const PRESETS = {
+    simple:  { atom2On: false, u2: 0.5, v2: 0.5, wRatio: 1.0 },
+    checker: { atom2On: true,  u2: 0.5, v2: 0.5, wRatio: 1.0 },
+    partial: { atom2On: true,  u2: 0.5, v2: 0.5, wRatio: 0.4 },
+  };
+
+  let activePreset = 'checker';
+  const presetBtns = Array.from(root.querySelectorAll('.sf-preset-btn'));
+  const customBtn = root.querySelector('#customBtn');
+
+  function setPresetUI() {
+    presetBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.preset === activePreset)));
+  }
+
+  function applyPreset(key) {
+    const p = PRESETS[key];
+    if (!p) return;
+    atom2OnEl.checked = p.atom2On;
+    inputs.u2.value = p.u2;
+    inputs.v2.value = p.v2;
+    inputs.wRatio.value = p.wRatio;
+    activePreset = key;
+    setPresetUI();
+    render();
+  }
+
+  presetBtns.forEach(btn => {
+    if (btn.dataset.preset === 'custom') return;
+    btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+  });
+
+  function markCustom() {
+    activePreset = 'custom';
+    setPresetUI();
+  }
+
+  [...ids, ].forEach(id => {
+    inputs[id].addEventListener('input', () => { markCustom(); render(); });
+  });
+  atom2OnEl.addEventListener('change', () => { markCustom(); render(); });
+  logScaleEl.addEventListener('change', render);
+
+  function isDark() {
+    const explicit = document.documentElement.getAttribute('data-theme');
+    if (explicit === 'dark') return true;
+    if (explicit === 'light') return false;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  function heatStops() {
+    const dark = isDark();
+    return dark
+      ? ['#1a1a19', '#104281', '#184f95', '#256abf', '#5598e7', '#9ec5f4']
+      : ['#fcfcfb', '#cde2fb', '#86b6ef', '#3987e5', '#1c5cab', '#0d366b'];
+  }
+  function hexToRgb(hex) {
+    const v = parseInt(hex.slice(1), 16);
+    return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+  }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function colorFor(t) {
+    t = Math.max(0, Math.min(1, t));
+    const stops = heatStops().map(hexToRgb);
+    const n = stops.length - 1;
+    const seg = t * n;
+    const i = Math.min(n - 1, Math.floor(seg));
+    const f = seg - i;
+    const c0 = stops[i], c1 = stops[i + 1];
+    const r = lerp(c0[0], c1[0], f), g = lerp(c0[1], c1[1], f), b = lerp(c0[2], c1[2], f);
+    return `rgb(${r|0},${g|0},${b|0})`;
+  }
+
+  function getState() {
+    return {
+      N1: parseInt(inputs.N1.value, 10),
+      N2: parseInt(inputs.N2.value, 10),
+      ratio: parseFloat(inputs.ratio.value),
+      gamma: parseFloat(inputs.gamma.value) * Math.PI / 180,
+      atom2On: atom2OnEl.checked,
+      u2: parseFloat(inputs.u2.value),
+      v2: parseFloat(inputs.v2.value),
+      wRatio: parseFloat(inputs.wRatio.value),
+      logScale: logScaleEl.checked,
+    };
+  }
+
+  function basisAtoms(s) {
+    const atoms = [{ u: 0, v: 0, w: 1 }];
+    if (s.atom2On) atoms.push({ u: s.u2, v: s.v2, w: s.wRatio });
+    return atoms;
+  }
+
+  function laue(N, x) {
+    const s = Math.sin(Math.PI * x);
+    if (Math.abs(s) < 1e-6) return N * N;
+    const num = Math.sin(N * Math.PI * x);
+    return (num * num) / (s * s);
+  }
+
+  function structureFactorSq(atoms, h, k) {
+    let re = 0, im = 0;
+    for (const a of atoms) {
+      const phase = -2 * Math.PI * (h * a.u + k * a.v);
+      re += a.w * Math.cos(phase);
+      im += a.w * Math.sin(phase);
+    }
+    return re * re + im * im;
+  }
+
+  function intensity(atoms, s, h, k) {
+    return laue(s.N1, h) * laue(s.N2, k) * structureFactorSq(atoms, h, k);
+  }
+
+  function reciprocalVectors(a1, a2) {
+    const area = a1[0] * a2[1] - a1[1] * a2[0];
+    const b1 = [2 * Math.PI * a2[1] / area, -2 * Math.PI * a2[0] / area];
+    const b2 = [-2 * Math.PI * a1[1] / area, 2 * Math.PI * a1[0] / area];
+    return [b1, b2];
+  }
+
+  function invert2x2(b1, b2) {
+    // columns b1, b2 -> matrix [[b1x,b2x],[b1y,b2y]]; returns function q -> [h,k]
+    const det = b1[0] * b2[1] - b2[0] * b1[1];
+    return function (qx, qy) {
+      const h = (b2[1] * qx - b2[0] * qy) / det;
+      const k = (-b1[1] * qx + b1[0] * qy) / det;
+      return [h, k];
+    };
+  }
+
+  function fitDPR(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width * dpr));
+    const h = Math.max(1, Math.round(rect.height * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    return { w, h, dpr };
+  }
+
+  let lastAtoms = [{ u: 0, v: 0, w: 1 }];
+  let lastS = getState();
+  let lastB1 = [2 * Math.PI, 0], lastB2 = [0, 2 * Math.PI];
+  let lastMaxI = 1;
+  const Q_MAX = 4 * 2 * Math.PI; // fixed physical window in reciprocal space
+
+  function drawRealSpace(s, atoms) {
+    const { w, h } = fitDPR(realCanvas);
+    const ctx = realCanvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    const cssColor = getComputedStyle(root);
+    const gridColor = cssColor.getPropertyValue('--grid').trim();
+    const accent = cssColor.getPropertyValue('--accent').trim();
+    const atom2Color = cssColor.getPropertyValue('--atom2').trim();
+
+    const a1 = [1, 0];
+    const a2 = [s.ratio * Math.cos(s.gamma), s.ratio * Math.sin(s.gamma)];
+
+    // fit the N1 x N2 parallelogram lattice into the canvas with margin
+    const corners = [
+      [0, 0],
+      [s.N1 * a1[0], s.N1 * a1[1]],
+      [s.N2 * a2[0], s.N2 * a2[1]],
+      [s.N1 * a1[0] + s.N2 * a2[0], s.N1 * a1[1] + s.N2 * a2[1]],
+    ];
+    const xs = corners.map(c => c[0]), ys = corners.map(c => c[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const spanX = Math.max(maxX - minX, 1e-6), spanY = Math.max(maxY - minY, 1e-6);
+    const margin = 0.14 * Math.min(w, h);
+    const scale = Math.min((w - 2 * margin) / spanX, (h - 2 * margin) / spanY);
+    const cx = w / 2 - ((minX + maxX) / 2) * scale;
+    const cy = h / 2 + ((minY + maxY) / 2) * scale;
+    const toPx = (x, y) => [cx + x * scale, cy - y * scale];
+
+    const atomR = Math.max(2.2, Math.min(7, scale * 0.16));
+
+    for (let i = 0; i < s.N1; i++) {
+      for (let j = 0; j < s.N2; j++) {
+        const ox = i * a1[0] + j * a2[0];
+        const oy = i * a1[1] + j * a2[1];
+        for (const at of atoms) {
+          const x = ox + at.u * a1[0] + at.v * a2[0];
+          const y = oy + at.u * a1[1] + at.v * a2[1];
+          const [px, py] = toPx(x, y);
+          const isAtom1 = at.u === 0 && at.v === 0;
+          ctx.beginPath();
+          ctx.fillStyle = isAtom1 ? accent : atom2Color;
+          const r = isAtom1 ? atomR : atomR * Math.max(0.35, Math.sqrt(Math.max(at.w, 0.02)));
+          ctx.arc(px, py, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // unit cell outline, one cell near the lattice origin
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    const cellPts = [[0, 0], a1, [a1[0] + a2[0], a1[1] + a2[1]], a2, [0, 0]].map(p => toPx(p[0], p[1]));
+    ctx.moveTo(cellPts[0][0], cellPts[0][1]);
+    for (let i = 1; i < cellPts.length; i++) ctx.lineTo(cellPts[i][0], cellPts[i][1]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawReciprocal(s, atoms) {
+    const { w, h } = fitDPR(reciCanvas);
+    const ctx = reciCanvas.getContext('2d');
+    const img = ctx.createImageData(w, h);
+
+    const a1 = [1, 0];
+    const a2 = [s.ratio * Math.cos(s.gamma), s.ratio * Math.sin(s.gamma)];
+    const [b1, b2] = reciprocalVectors(a1, a2);
+    const qToHk = invert2x2(b1, b2);
+    const sumW = atoms.reduce((acc, a) => acc + a.w, 0);
+    const maxI = s.N1 * s.N1 * s.N2 * s.N2 * sumW * sumW;
+
+    const dark = isDark();
+    const stops = heatStops().map(hexToRgb);
+    const n = stops.length - 1;
+
+    for (let py = 0; py < h; py++) {
+      const qy = -((py / h) - 0.5) * 2 * Q_MAX;
+      for (let px = 0; px < w; px++) {
+        const qx = ((px / w) - 0.5) * 2 * Q_MAX;
+        const [hk_h, hk_k] = qToHk(qx, qy);
+        let I = intensity(atoms, s, hk_h, hk_k) / maxI;
+        let t = s.logScale ? Math.log10(1 + 99 * I) / 2 : I;
+        t = Math.max(0, Math.min(1, t));
+        const seg = t * n;
+        const i0 = Math.min(n - 1, Math.floor(seg));
+        const f = seg - i0;
+        const c0 = stops[i0], c1 = stops[i0 + 1];
+        const idx = (py * w + px) * 4;
+        img.data[idx] = lerp(c0[0], c1[0], f);
+        img.data[idx + 1] = lerp(c0[1], c1[1], f);
+        img.data[idx + 2] = lerp(c0[2], c1[2], f);
+        img.data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    lastB1 = b1; lastB2 = b2; lastMaxI = maxI;
+  }
+
+  function updateLabels(s) {
+    root.querySelector('#valN1').textContent = s.N1;
+    root.querySelector('#valN2').textContent = s.N2;
+    root.querySelector('#valRatio').textContent = s.ratio.toFixed(2);
+    root.querySelector('#valGamma').textContent = Math.round(s.gamma * 180 / Math.PI) + '°';
+    root.querySelector('#valU2').textContent = s.u2.toFixed(2);
+    root.querySelector('#valV2').textContent = s.v2.toFixed(2);
+    root.querySelector('#valW').textContent = s.wRatio.toFixed(2);
+    atom2Label.textContent = s.atom2On ? `atom 2 (f₂/f₁ = ${s.wRatio.toFixed(2)})` : 'atom 2 (off)';
+    atom2Swatch.style.opacity = s.atom2On ? 1 : 0.25;
+    [inputs.u2, inputs.v2, inputs.wRatio].forEach(el => el.disabled = !s.atom2On);
+  }
+
+  function render() {
+    const s = getState();
+    const atoms = basisAtoms(s);
+    lastAtoms = atoms; lastS = s;
+    updateLabels(s);
+    drawRealSpace(s, atoms);
+    drawReciprocal(s, atoms);
+  }
+
+  reciCanvas.addEventListener('mousemove', (e) => {
+    const rect = reciCanvas.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const qx = ((px / rect.width) - 0.5) * 2 * Q_MAX;
+    const qy = -((py / rect.height) - 0.5) * 2 * Q_MAX;
+    const qToHk = invert2x2(lastB1, lastB2);
+    const [hf, kf] = qToHk(qx, qy);
+    const I = intensity(lastAtoms, lastS, hf, kf) / lastMaxI;
+    const hR = Math.round(hf), kR = Math.round(kf);
+    const Ipeak = intensity(lastAtoms, lastS, hR, kR) / lastMaxI;
+
+    tooltip.style.left = px + 'px';
+    tooltip.style.top = py + 'px';
+    tooltip.classList.add('visible');
+    const pct = (I * 100).toFixed(1);
+    let note = '';
+    if (Math.abs(hf - hR) < 0.15 && Math.abs(kf - kR) < 0.15) {
+      note = Ipeak < 0.005 ? ' — systematically absent' : ` — peak (h,k)=(${hR},${kR})`;
+    }
+    tooltip.textContent = `h=${hf.toFixed(2)}, k=${kf.toFixed(2)}  I=${pct}%${note}`;
+    readout.innerHTML = `Nearest reflection <b>(${hR}, ${kR})</b>: relative intensity <b>${(Ipeak * 100).toFixed(1)}%</b>${Ipeak < 0.005 ? ' — <b>forbidden</b> by destructive interference between the two basis atoms.' : '.'}`;
+  });
+  reciCanvas.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+
+  window.addEventListener('resize', render);
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+  }
+
+  setPresetUI();
+  render();
+})();
+</script>
+</body>
+</html>
