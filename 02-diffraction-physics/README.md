@@ -11,8 +11,6 @@ A six-lecture module building electron diffraction and dynamical scattering theo
 | 5 | Bloch waves & the dispersion surface | [md](lecture-notes/lecture-05-bloch-waves-dispersion-surface.md) · [pdf](lecture-notes/lecture-05-bloch-waves-dispersion-surface.pdf) | |
 | 6 | Howie-Whelan equations, Pendellösung, multislice | [md](lecture-notes/lecture-06-howie-whelan-pendellosung-multislice.md) · [pdf](lecture-notes/lecture-06-howie-whelan-pendellosung-multislice.pdf) | [HCP Dislocation Contrast](widgets/hcp_dislocations_full.html) |
 
-Widget placement above is my best current mapping of each tool to the lecture it supports (e.g. the dislocation-contrast widget pairs with the Howie-Whelan equations used to simulate defect images); it'll move if a lecture gets rewritten around a different widget.
-
 ## Widgets standalone
 
 All four are self-contained HTML — open directly in a browser, no server needed:
