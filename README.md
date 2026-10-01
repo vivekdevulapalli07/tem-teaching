@@ -16,7 +16,7 @@ Each chapter is a numbered top-level folder, meant to be worked through in order
 |---|---------|--------|----------|
 | 01 | [Describing the instrument](01-describing-the-instrument/) | Available | Electron wavelength vs. accelerating potential; diffraction-limited resolution |
 | 02 | [Diffraction physics](02-diffraction-physics/) | Available | 6-lecture module: wave equation → Howie-Whelan/multislice, with 4 interactive widgets |
-| 03 | [Aberration correction](03-aberration-correction/) | Planned | — |
+| 03 | [Aberration correction](03-aberration-correction/) | In progress | Interactive [Aberration Explorer](03-aberration-correction/widgets/aberration-explorer.html) widget; lecture notes to follow |
 | 04 | [In-situ electron microscopy](04-in-situ-electron-microscopy/) | Planned | — |
 
 ## Running the notebooks
